@@ -2,591 +2,494 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/> 
-<title>Camera Inventory</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Продажи</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#0f0f14;color:#e8e8e8;font-family:'Courier New',monospace;min-height:100vh}
-  button{cursor:pointer;font-family:inherit}
-  input,select,textarea{font-family:inherit}
+@import url('https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-  /* Header */
-  .header{background:#0a0a10;border-bottom:1px solid #1a1a2a;padding:0 16px}
-  .header-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:12px 0}
-  .logo-title{font-size:15px;font-weight:bold;color:#fff;letter-spacing:1px}
-  .logo-sub{font-size:10px;color:#3a3a5a;letter-spacing:2px;margin-top:2px}
-  .nav{display:flex;gap:4px;flex-wrap:wrap}
-  .nav-btn{padding:6px 14px;font-size:12px;border:1px solid #2a2a3a;background:transparent;color:#777;border-radius:4px;transition:all .2s}
-  .nav-btn.active{border-color:#6366f1;background:#312e81;color:#fff}
+:root{
+  --bg:#0e0e11;--s1:#17171c;--s2:#1f1f27;--border:#2c2c38;
+  --text:#eeeef5;--muted:#55556a;--muted2:#3a3a4a;
+  --accent:#7c6af7;--teal:#3ecfbf;--red:#ff5252;--gold:#f0b429;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--text);font-family:'Onest',sans-serif;min-height:100vh;overscroll-behavior:none;}
 
-  /* Main */
-  .main{max-width:1100px;margin:0 auto;padding:20px 16px}
+/* HEADER */
+.hdr{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border);}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;}
+.app-name{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:500;}
+.hdr-right{display:flex;align-items:center;gap:10px;}
 
-  /* Stats grid */
-  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:24px}
-  .stat-card{background:#16161f;border-radius:8px;padding:14px}
-  .stat-num{font-size:30px;font-weight:bold}
-  .stat-label{font-size:10px;color:#555;margin-top:4px;line-height:1.4}
+/* Sync indicator */
+.sync{width:7px;height:7px;border-radius:50%;background:var(--muted2);transition:background .3s;flex-shrink:0;}
+.sync.ok{background:var(--teal);}
+.sync.err{background:var(--red);}
+.sync.loading{background:var(--gold);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-  /* Toolbar */
-  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
-  .btn-primary{background:#4f46e5;color:#fff;border:none;padding:8px 18px;border-radius:5px;font-size:13px}
-  .btn-secondary{background:transparent;color:#777;border:1px solid #2a2a3a;padding:8px 12px;border-radius:5px;font-size:12px}
-  .search-input{background:#16161f;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:5px;font-size:13px;flex:1;min-width:100px}
-  .filter-select{background:#16161f;border:1px solid #2a2a3a;color:#fff;padding:8px 10px;border-radius:5px;font-size:12px}
+/* Year nav */
+.year-nav{display:flex;align-items:center;}
+.yr-btn{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 10px;border-radius:6px;transition:.15s;line-height:1;}
+.yr-btn:hover{color:var(--text);background:var(--s2);}
+.yr-num{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);font-weight:600;min-width:40px;text-align:center;}
 
-  /* Camera cards */
-  .camera-list{display:grid;gap:7px}
-  .camera-card{background:#16161f;border:1px solid #1a1a2a;border-radius:8px;padding:12px 16px}
-  .camera-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px}
-  .camera-info{flex:1}
-  .camera-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-  .cam-num{color:#6366f1;font-weight:bold;font-size:13px}
-  .cam-name{color:#fff;font-size:13px}
-  .status-badge{font-size:10px;padding:2px 7px;border-radius:3px}
-  .bin-badge{background:#1a1a30;color:#a5b4fc;font-size:10px;padding:2px 7px;border-radius:3px;border:1px solid #2a2a5a}
-  .parts-row{display:flex;gap:4px;flex-wrap:wrap}
-  .part-badge{font-size:10px;padding:2px 6px;border-radius:3px}
-  .part-ok{background:#14532d44;color:#86efac;border:1px solid #166534}
-  .part-bad{background:#7f1d1d44;color:#fca5a5;border:1px solid #991b1b}
-  .cam-notes{font-size:10px;color:#555;margin-top:6px;font-style:italic}
-  .card-actions{display:flex;gap:5px}
-  .btn-edit{background:#1a1a2a;border:1px solid #2a2a3a;color:#a5b4fc;padding:5px 10px;border-radius:4px;font-size:12px}
-  .btn-delete{background:#1a1a2a;border:1px solid #2a2a3a;color:#f87171;padding:5px 10px;border-radius:4px;font-size:12px}
+/* STATS */
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 16px 12px;}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:10px 11px;position:relative;overflow:hidden;}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat.revenue::before{background:var(--accent);}
+.stat.profit-m::before{background:var(--teal);}
+.stat.profit-y::before{background:var(--gold);}
+.stat-lbl{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;line-height:1.2;}
+.stat-amt{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stat.revenue .stat-amt{color:var(--accent);}
+.stat.profit-m .stat-amt{color:var(--teal);}
+.stat.profit-y .stat-amt{color:var(--gold);}
+.stat-cnt{font-size:9px;color:var(--muted);margin-top:1px;}
 
-  /* Modal */
-  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto}
-  .modal{background:#16161f;border:1px solid #2a2a3a;border-radius:10px;padding:24px;width:100%;max-width:480px}
-  .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-  .modal-title{font-size:14px;color:#fff;font-weight:bold}
-  .btn-close{background:none;border:none;color:#555;font-size:20px}
-  .auto-num{background:#0f0f14;border:1px solid #312e81;border-radius:6px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
-  .auto-num-label{font-size:10px;color:#555;letter-spacing:1px}
-  .auto-num-value{color:#a5b4fc;font-weight:bold;font-size:20px;letter-spacing:3px}
-  .auto-num-hint{font-size:9px;color:#333}
-  .field{margin-bottom:12px}
-  .field label{display:block;font-size:10px;color:#555;margin-bottom:5px;letter-spacing:1px}
-  .field input,.field select,.field textarea{width:100%;background:#0f0f14;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:5px;font-size:13px}
-  .field textarea{min-height:55px;resize:vertical}
-  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .form-actions{display:flex;gap:8px;margin-top:16px}
-  .btn-save{flex:1;background:#4f46e5;color:#fff;border:none;padding:10px;border-radius:6px;font-size:14px}
-  .btn-cancel{background:transparent;color:#666;border:1px solid #2a2a3a;padding:10px 18px;border-radius:6px;font-size:14px}
+/* SPARKLINE */
+.sparkline{display:flex;align-items:flex-end;gap:3px;padding:0 16px 10px;height:28px;}
+.sp-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;gap:2px;}
+.sp-bar{width:100%;border-radius:2px 2px 0 0;min-height:2px;transition:height .3s ease;}
+.sp-bar.cur{box-shadow:0 0 6px rgba(124,106,247,.6);}
+.sp-lbl{font-size:7.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;line-height:1;}
+.sp-lbl.cur{color:var(--accent);}
 
-  /* Assembly */
-  .assembly-input{width:100%;background:#16161f;border:1px solid #3a3a5a;color:#fff;padding:10px 14px;border-radius:6px;font-size:14px;margin-bottom:20px}
-  .assembly-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px}
-  .assembly-card{background:#16161f;border-radius:8px;padding:16px}
-  .assembly-num{font-size:34px;font-weight:bold}
-  .assembly-label{font-size:11px;color:#555;margin-top:4px}
-  .section-title{font-size:10px;color:#3a3a5a;letter-spacing:2px;margin-bottom:8px}
-  .bin-row{background:#16161f;border:1px solid #1a1a2a;border-radius:6px;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px}
-  .bin-name{color:#a5b4fc;font-weight:bold}
-  .bin-stats{display:flex;gap:16px}
-  .empty-state{text-align:center;padding:50px;color:#333}
-  .empty-icon{font-size:44px;margin-bottom:10px}
-  .count-label{font-size:10px;color:#3a3a5a;letter-spacing:1px;margin-bottom:10px}
+/* MONTH TABS */
+.tabs-wrap{display:flex;overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--border);}
+.tabs-wrap::-webkit-scrollbar{display:none;}
+.tab{flex-shrink:0;padding:8px 13px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Onest',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:.15s;position:relative;}
+.tab.has-data::after{content:'';position:absolute;top:8px;right:7px;width:3px;height:3px;border-radius:50%;background:var(--teal);opacity:.7;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 
-  /* Toast */
-  .toast{position:fixed;top:20px;right:20px;z-index:9999;padding:10px 20px;border-radius:6px;font-size:14px;box-shadow:0 4px 20px rgba(0,0,0,.5);display:none}
-  .toast.show{display:block}
-  .toast.success{background:#14532d;color:#fff;border:1px solid #22c55e}
-  .toast.error{background:#7f1d1d;color:#fff;border:1px solid #ef4444}
+/* ADD FORM */
+.form-wrap{margin:12px 16px;}
+.form-inner{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:7px;}
+.inp{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:11px 12px;color:var(--text);font-family:'Onest',sans-serif;font-size:15px;outline:none;transition:border-color .2s;width:100%;}
+.inp:focus{border-color:var(--accent);}
+.inp::placeholder{color:var(--muted);}
+.inp.mono{font-family:'JetBrains Mono',monospace;}
+.inp:disabled{opacity:.5;}
+.form-prices{display:flex;gap:7px;align-items:stretch;}
+.price-group{flex:1;position:relative;}
+.price-group .inp{padding-left:20px;}
+.price-prefix{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);pointer-events:none;}
+.btn-add{background:var(--accent);border:none;border-radius:8px;width:46px;flex-shrink:0;color:#fff;font-size:24px;font-weight:300;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;}
+.btn-add:active{transform:scale(.91);}
+.btn-add:disabled{opacity:.5;cursor:not-allowed;}
 
-  /* Brand manager */
-  .brand-list{max-height:300px;overflow-y:auto;display:grid;gap:5px}
-  .brand-item{display:flex;justify-content:space-between;align-items:center;background:#0f0f14;padding:8px 12px;border-radius:5px}
-  .brand-name{color:#e8e8e8;font-size:13px}
-  .btn-remove-brand{background:none;border:none;color:#f87171;font-size:16px}
+/* LIST */
+.list{padding:0 16px 50px;display:flex;flex-direction:column;gap:6px;}
+.row{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:grid;grid-template-columns:16px 1fr auto;grid-template-rows:auto auto;column-gap:8px;row-gap:3px;animation:pop .2s ease;}
+@keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.row-num{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:right;grid-row:1;align-self:center;}
+.row-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;grid-row:1;align-self:center;}
+.row-profit{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:var(--teal);white-space:nowrap;grid-row:1;align-self:center;text-align:right;}
+.row-profit.loss{color:var(--red);}
+.row-meta{grid-column:2;grid-row:2;display:flex;align-items:center;gap:8px;}
+.row-prices-txt{font-family:'JetBrains Mono',monospace;font-size:11px;display:flex;align-items:center;gap:4px;}
+.price-arrow{color:var(--muted2);font-size:10px;}
+.price-buy{color:var(--muted);}
+.price-sell{color:var(--text);}
+.row-date{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-left:auto;}
+.row-actions{grid-column:3;grid-row:2;display:flex;gap:2px;align-items:center;justify-content:flex-end;}
+.ico{background:none;border:none;width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;opacity:.28;transition:.15s;color:var(--text);}
+.ico:active{opacity:1;}
+.ico.edit:hover{color:var(--accent);opacity:1;background:rgba(124,106,247,.1);}
+.ico.copy:hover{color:var(--gold);opacity:1;background:rgba(240,180,41,.1);}
+.ico.del:hover{color:var(--red);opacity:1;background:rgba(255,82,82,.1);}
 
-  .loading{text-align:center;padding:60px;color:#555;font-size:16px}
-  .spinner{display:inline-block;width:20px;height:20px;border:2px solid #333;border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;margin-right:10px;vertical-align:middle}
-  @keyframes spin{to{transform:rotate(360deg)}}
+/* EDIT ROW */
+.row.editing{border-color:var(--accent);background:rgba(124,106,247,.05);}
+.edit-row-top{grid-column:1/-1;grid-row:1;display:flex;gap:6px;align-items:center;}
+.edit-row-bot{grid-column:1/-1;grid-row:2;display:flex;gap:6px;align-items:center;}
+.edit-inp{background:var(--s2);border:1px solid var(--accent);border-radius:6px;padding:7px 9px;color:var(--text);font-family:'Onest',sans-serif;font-size:13px;outline:none;}
+.edit-inp.mono{font-family:'JetBrains Mono',monospace;}
+.edit-inp.sm{width:80px;}
+.btn-ok{background:var(--accent);border:none;border-radius:6px;padding:7px 12px;color:#fff;font-family:'Onest',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.btn-x{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px;opacity:.5;}
+
+/* EMPTY / LOADING */
+.empty{text-align:center;padding:40px 0;color:var(--muted);font-size:14px;}
+.empty-i{font-size:28px;margin-bottom:8px;opacity:.3;}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:flex-end;justify-content:center;z-index:999;backdrop-filter:blur(8px);}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:22px 20px 44px;width:100%;max-width:480px;text-align:center;}
+.modal-i{font-size:24px;margin-bottom:10px;}
+.modal-t{font-size:16px;font-weight:600;margin-bottom:4px;}
+.modal-s{font-size:13px;color:var(--muted);margin-bottom:20px;}
+.modal-btns{display:flex;gap:10px;}
+.btn-cancel{flex:1;padding:13px;background:var(--s2);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Onest',sans-serif;font-size:15px;cursor:pointer;}
+.btn-del{flex:1;padding:13px;background:var(--red);border:none;border-radius:10px;color:#fff;font-family:'Onest',sans-serif;font-size:15px;font-weight:600;cursor:pointer;}
 </style>
 </head>
 <body>
-
-<div id="toast" class="toast"></div>
-
-<!-- Header -->
-<div class="header">
-  <div class="header-inner">
-    <div>
-      <div class="logo-title">📷 CAMERA INVENTORY</div>
-      <div class="logo-sub" id="next-num-label">СЛЕДУЮЩИЙ: CAM-001</div>
-    </div>
-    <nav class="nav">
-      <button class="nav-btn active" onclick="switchView('dashboard')">📊 Главная</button>
-      <button class="nav-btn" onclick="switchView('cameras')">📋 Камеры</button>
-      <button class="nav-btn" onclick="switchView('assembly')">🔧 Сборка</button>
-    </nav>
-  </div>
-</div>
-
-<div class="main">
-  <div id="view-dashboard">
-    <div class="stats-grid" id="stats-grid"></div>
-    <div class="count-label">ПОСЛЕДНИЕ ДОБАВЛЕННЫЕ</div>
-    <div id="recent-list"></div>
-    <div id="dashboard-empty" class="empty-state" style="display:none">
-      <div class="empty-icon">📷</div>
-      <div style="color:#444;font-size:14px">Камер пока нет</div>
-      <div style="color:#333;font-size:11px;margin-top:6px">Перейди во вкладку «Камеры» и добавь первую</div>
-    </div>
-  </div>
-
-  <div id="view-cameras" style="display:none">
-    <div class="toolbar">
-      <button class="btn-primary" onclick="openAddForm()">+ Добавить камеру</button>
-      <button class="btn-secondary" onclick="openBrandMgr()">⚙ Бренды</button>
-      <button class="btn-secondary" onclick="printList()">🖨 Печать</button>
-      <input class="search-input" id="search-input" placeholder="Поиск..." oninput="renderCameras()"/>
-      <select class="filter-select" id="filter-status" onchange="renderCameras()">
-        <option value="all">Все статусы</option>
-        <option value="working">Работает</option>
-        <option value="broken">Разбита</option>
-        <option value="repair">На ремонте</option>
-      </select>
-      <select class="filter-select" id="filter-brand" onchange="renderCameras()">
-        <option value="all">Все бренды</option>
-      </select>
-    </div>
-    <div class="count-label" id="cameras-count">КАМЕР: 0</div>
-    <div class="camera-list" id="camera-list">
-      <div class="loading"><span class="spinner"></span>Загрузка...</div>
-    </div>
-  </div>
-
-  <div id="view-assembly" style="display:none">
-    <div class="count-label">КАЛЬКУЛЯТОР СБОРКИ</div>
-    <div style="font-size:12px;color:#555;margin-bottom:12px">Введи бренд или модель — увидишь сколько камер есть и сколько полностью рабочих</div>
-    <input class="assembly-input" id="assembly-search" placeholder="Например: Canon, или EOS 600D..." oninput="renderAssembly()"/>
-    <div id="assembly-results"></div>
-    <div id="assembly-empty" class="empty-state">
-      <div class="empty-icon">🔧</div>
-      <div style="color:#3a3a5a;font-size:12px">Введи модель чтобы начать анализ</div>
-    </div>
-  </div>
-</div>
-
-<!-- Camera Form Modal -->
-<div id="form-modal" class="modal-overlay" style="display:none">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="form-title">Добавить камеру</div>
-      <button class="btn-close" onclick="closeForm()">✕</button>
-    </div>
-    <div class="auto-num">
-      <span class="auto-num-label">НОМЕР КАМЕРЫ</span>
-      <span class="auto-num-value" id="form-num-display">CAM-001</span>
-      <span class="auto-num-hint">авто</span>
-    </div>
-    <div class="grid-2">
-      <div class="field"><label>БРЕНД</label>
-        <select id="f-brand"><option value="">— выбери —</option></select>
-      </div>
-      <div class="field"><label>МОДЕЛЬ</label>
-        <input id="f-model" placeholder="EOS 600D"/>
-      </div>
-    </div>
-    <div class="field"><label>BIN № ЯЩИКА</label>
-      <input id="f-bin" placeholder="A-12"/>
-    </div>
-    <div class="field"><label>СТАТУС</label>
-      <select id="f-status">
-        <option value="working">✅ Работает</option>
-        <option value="broken">❌ Разбита</option>
-        <option value="repair">🔧 На ремонте</option>
-      </select>
-    </div>
-    <div class="grid-2">
-      <div class="field"><label>КОРПУС</label>
-        <select id="f-body"><option value="ok">✅ ОК</option><option value="broken">❌ Сломан</option></select>
-      </div>
-      <div class="field"><label>КРЫШКА АКБ</label>
-        <select id="f-battery"><option value="ok">✅ ОК</option><option value="broken">❌ Сломана</option></select>
-      </div>
-      <div class="field"><label>ОБЪЕКТИВ</label>
-        <select id="f-lens"><option value="ok">✅ ОК</option><option value="broken">❌ Сломан</option></select>
-      </div>
-      <div class="field"><label>ЖК-ДИСПЛЕЙ</label>
-        <select id="f-lcd"><option value="ok">✅ ОК</option><option value="broken">❌ Разбит</option></select>
-      </div>
-    </div>
-    <div class="field"><label>ЗАМЕТКИ</label>
-      <textarea id="f-notes" placeholder="Дополнительная информация..."></textarea>
-    </div>
-    <div class="form-actions">
-      <button class="btn-save" onclick="saveCamera()">💾 Сохранить</button>
-      <button class="btn-cancel" onclick="closeForm()">Отмена</button>
-    </div>
-  </div>
-</div>
-
-<!-- Brand Manager Modal -->
-<div id="brand-modal" class="modal-overlay" style="display:none">
-  <div class="modal" style="max-width:360px">
-    <div class="modal-header">
-      <div class="modal-title">Управление брендами</div>
-      <button class="btn-close" onclick="closeBrandMgr()">✕</button>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input id="new-brand-input" class="search-input" placeholder="Новый бренд..." style="flex:1" onkeydown="if(event.key==='Enter')addBrand()"/>
-      <button class="btn-primary" style="padding:8px 14px" onclick="addBrand()">+</button>
-    </div>
-    <div class="brand-list" id="brand-list"></div>
-  </div>
-</div>
-
+<div id="app"></div>
 <script>
-const SUPABASE_URL = 'https://audcbthzhkadhtohixub.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1ZGNidGh6aGthZGh0b2hpeHViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNTU4OTEsImV4cCI6MjA4OTYzMTg5MX0.Grt_A2q_3rTFmP0Kc1hTtITqfpMQ6UXX6d-hsr0-NIU';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ── CONFIG ──────────────────────────────────────────────
+const SB_URL = 'https://audcbthzhkadhtohixub.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1ZGNidGh6aGthZGh0b2hpeHViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNTU4OTEsImV4cCI6MjA4OTYzMTg5MX0.Grt_A2q_3rTFmP0Kc1hTtITqfpMQ6UXX6d-hsr0-NIU';
 
-const DEFAULT_BRANDS = ['Canon','Nikon','Sony','Pentax','Fujifilm','Olympus','Leica','Minolta','Kodak','Nokia','Polaroid','Ricoh','Sigma','Tamron'];
-const STATUS_LABELS = {working:'Работает', broken:'Разбита', repair:'На ремонте'};
-const STATUS_COLORS = {working:'#22c55e', broken:'#ef4444', repair:'#f59e0b'};
+// ── CONSTANTS ────────────────────────────────────────────
+const MO = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+const MF = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
-let cameras = [];
-let brands = [];
-let currentView = 'dashboard';
-let editingId = null;
+// ── STATE ─────────────────────────────────────────────────
+const S = {
+  sales: [],
+  month: new Date().getMonth(),
+  year:  new Date().getFullYear(),
+  loading: true,   // initial data fetch
+  saving:  false,  // any write in progress
+  syncOk:  null,   // null=unknown, true=ok, false=error
+  editId: null, editName: '', editBuy: '', editSell: '',
+  newName: '', newBuy: '', newSell: '',
+  delId: null
+};
 
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-function padNum(n) { return 'CAM-' + String(n).padStart(3,'0'); }
-function getNextNum() {
-  if (!cameras.length) return 1;
-  const nums = cameras.map(c => { const m = c.number?.match(/CAM-(\d+)/i); return m ? parseInt(m[1]) : 0; });
-  return Math.max(...nums) + 1;
-}
+// ── SUPABASE API ─────────────────────────────────────────
+const headers = {
+  'Content-Type': 'application/json',
+  'apikey': SB_KEY,
+  'Authorization': `Bearer ${SB_KEY}`
+};
 
-function showToast(msg, type='success') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + type;
-  setTimeout(() => t.className = 'toast', 2500);
-}
-
-function switchView(v) {
-  currentView = v;
-  ['dashboard','cameras','assembly'].forEach(name => {
-    document.getElementById('view-'+name).style.display = name === v ? '' : 'none';
-  });
-  document.querySelectorAll('.nav-btn').forEach((btn, i) => {
-    btn.classList.toggle('active', ['dashboard','cameras','assembly'][i] === v);
-  });
-  if (v === 'dashboard') renderDashboard();
-  if (v === 'cameras') renderCameras();
-  if (v === 'assembly') renderAssembly();
-}
-
-// ── LOAD DATA ──
-async function loadAll() {
-  const [camRes, brandRes] = await Promise.all([
-    sb.from('cameras').select('*').order('created_at', {ascending: true}),
-    sb.from('brands').select('*').order('name')
-  ]);
-  cameras = camRes.data || [];
-  brands = brandRes.data?.map(b => b.name) || [];
-  if (!brands.length) {
-    await Promise.all(DEFAULT_BRANDS.map(name => sb.from('brands').upsert({name})));
-    brands = DEFAULT_BRANDS;
+async function dbLoad() {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/sales?select=*&order=date.desc`, { headers });
+    if (!r.ok) throw new Error(r.status);
+    const rows = await r.json();
+    S.sales = rows.map(row => ({
+      id:        row.id,
+      name:      row.name,
+      buyPrice:  Number(row.buy_price) || 0,
+      sellPrice: Number(row.sell_price),
+      date:      row.date
+    }));
+    S.syncOk = true;
+  } catch(e) {
+    console.error('Load error', e);
+    S.syncOk = false;
+  } finally {
+    S.loading = false;
+    render();
   }
-  updateNextNumLabel();
-  renderDashboard();
-  renderBrandSelects();
 }
 
-function updateNextNumLabel() {
-  document.getElementById('next-num-label').textContent = 'СЛЕДУЮЩИЙ: ' + padNum(getNextNum());
+async function dbInsert(sale) {
+  const r = await fetch(`${SB_URL}/rest/v1/sales`, {
+    method: 'POST',
+    headers: { ...headers, 'Prefer': 'return=representation' },
+    body: JSON.stringify({
+      id:         sale.id,
+      name:       sale.name,
+      buy_price:  sale.buyPrice,
+      sell_price: sale.sellPrice,
+      date:       sale.date
+    })
+  });
+  if (!r.ok) throw new Error(await r.text());
 }
 
-// ── DASHBOARD ──
-function renderDashboard() {
-  const stats = {
-    total: cameras.length,
-    working: cameras.filter(c => c.status === 'working').length,
-    broken: cameras.filter(c => c.status === 'broken').length,
-    repair: cameras.filter(c => c.status === 'repair').length,
-    brokenLens: cameras.filter(c => c.lens === 'broken').length,
-    brokenLcd: cameras.filter(c => c.lcd === 'broken').length,
-    brokenBody: cameras.filter(c => c.body === 'broken').length,
+async function dbUpdate(sale) {
+  const r = await fetch(`${SB_URL}/rest/v1/sales?id=eq.${sale.id}`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Prefer': 'return=representation' },
+    body: JSON.stringify({
+      name:       sale.name,
+      buy_price:  sale.buyPrice,
+      sell_price: sale.sellPrice
+    })
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+async function dbDelete(id) {
+  const r = await fetch(`${SB_URL}/rest/v1/sales?id=eq.${id}`, {
+    method: 'DELETE',
+    headers
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+// ── HELPERS ───────────────────────────────────────────────
+const gid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+const mSales = (m, y) => S.sales.filter(s => { const d = new Date(s.date); return d.getMonth()===m && d.getFullYear()===y; });
+const ySales = y => S.sales.filter(s => new Date(s.date).getFullYear() === y);
+const sumRevenue = arr => arr.reduce((a,s) => a + s.sellPrice, 0);
+const sumProfit  = arr => arr.reduce((a,s) => a + (s.sellPrice - s.buyPrice), 0);
+const fmt   = n => n.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fdate = iso => { const d = new Date(iso); return `${d.getDate().toString().padStart(2,'0')} ${MO[d.getMonth()]}`; };
+const plural = n => n%10===1&&n%100!==11?'продажа':[2,3,4].includes(n%10)&&![12,13,14].includes(n%100)?'продажи':'продаж';
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ── ACTIONS ───────────────────────────────────────────────
+async function addSale() {
+  const name = S.newName.trim();
+  const sell = parseFloat(S.newSell);
+  const buy  = parseFloat(S.newBuy) || 0;
+  if (!name || isNaN(sell) || sell <= 0) return;
+
+  const now  = new Date();
+  const sale = {
+    id: gid(), name, buyPrice: buy, sellPrice: sell,
+    date: new Date(S.year, S.month, now.getDate(), now.getHours(), now.getMinutes()).toISOString()
   };
-  const items = [
-    {label:'Всего камер', value:stats.total, color:'#6366f1'},
-    {label:'Работают', value:stats.working, color:'#22c55e'},
-    {label:'Разбиты', value:stats.broken, color:'#ef4444'},
-    {label:'На ремонте', value:stats.repair, color:'#f59e0b'},
-    {label:'Сломан объектив', value:stats.brokenLens, color:'#f97316'},
-    {label:'Разбит ЖК', value:stats.brokenLcd, color:'#a855f7'},
-    {label:'Сломан корпус', value:stats.brokenBody, color:'#ec4899'},
-  ];
-  document.getElementById('stats-grid').innerHTML = items.map(s =>
-    `<div class="stat-card" style="border:1px solid ${s.color}25">
-      <div class="stat-num" style="color:${s.color}">${s.value}</div>
-      <div class="stat-label">${s.label}</div>
-    </div>`
-  ).join('');
 
-  const empty = document.getElementById('dashboard-empty');
-  const recent = document.getElementById('recent-list');
-  if (!cameras.length) { empty.style.display = ''; recent.style.display = 'none'; return; }
-  empty.style.display = 'none'; recent.style.display = '';
-  recent.innerHTML = [...cameras].reverse().slice(0,8).map(c =>
-    `<div style="background:#16161f;border:1px solid #1a1a2a;border-radius:6px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
-      <div style="display:flex;gap:10px;align-items:center">
-        <span style="color:#6366f1;font-weight:bold;font-size:13px">${c.number}</span>
-        <span style="color:#c7d2fe;font-size:13px">${c.brand} ${c.model}</span>
-        ${c.bin_number ? `<span style="color:#444;font-size:11px">BIN: ${c.bin_number}</span>` : ''}
-      </div>
-      <span style="background:${STATUS_COLORS[c.status]}20;color:${STATUS_COLORS[c.status]};font-size:10px;padding:2px 8px;border-radius:3px">${STATUS_LABELS[c.status]}</span>
-    </div>`
-  ).join('');
+  // Optimistic update
+  S.sales.unshift(sale);
+  S.newName = ''; S.newBuy = ''; S.newSell = '';
+  S.saving = true; S.syncOk = null;
+  render();
+
+  try {
+    await dbInsert(sale);
+    S.syncOk = true;
+  } catch(e) {
+    // Rollback
+    S.sales = S.sales.filter(x => x.id !== sale.id);
+    S.syncOk = false;
+    alert('Ошибка сохранения. Попробуй ещё раз.');
+  } finally {
+    S.saving = false;
+    render();
+  }
 }
 
-// ── CAMERAS ──
-function renderCameras() {
-  const search = document.getElementById('search-input').value.toLowerCase();
-  const fStatus = document.getElementById('filter-status').value;
-  const fBrand = document.getElementById('filter-brand').value;
-  let filtered = cameras.filter(c => {
-    if (fStatus !== 'all' && c.status !== fStatus) return false;
-    if (fBrand !== 'all' && c.brand !== fBrand) return false;
-    if (search) return (c.number+c.model+c.brand+c.bin_number+c.notes).toLowerCase().includes(search);
-    return true;
-  });
-  document.getElementById('cameras-count').textContent = `НАЙДЕНО: ${filtered.length} / ${cameras.length}`;
-  if (!filtered.length) {
-    document.getElementById('camera-list').innerHTML = '<div style="text-align:center;padding:40px;color:#444">Камер не найдено</div>';
-    return;
+async function saveEdit(id) {
+  const name = S.editName.trim();
+  const sell = parseFloat(S.editSell);
+  const buy  = parseFloat(S.editBuy) || 0;
+  if (!name || isNaN(sell) || sell <= 0) return;
+
+  const s = S.sales.find(x => x.id === id);
+  const prev = { name: s.name, buyPrice: s.buyPrice, sellPrice: s.sellPrice };
+
+  s.name = name; s.buyPrice = buy; s.sellPrice = sell;
+  S.editId = null; S.saving = true; S.syncOk = null;
+  render();
+
+  try {
+    await dbUpdate(s);
+    S.syncOk = true;
+  } catch(e) {
+    // Rollback
+    Object.assign(s, prev);
+    S.syncOk = false;
+    alert('Ошибка сохранения. Попробуй ещё раз.');
+  } finally {
+    S.saving = false;
+    render();
   }
-  document.getElementById('camera-list').innerHTML = filtered.map(c => {
-    const parts = [['Корпус',c.body],['АКБ крышка',c.battery_lid],['Объектив',c.lens],['ЖК',c.lcd]];
-    return `<div class="camera-card">
-      <div class="camera-top">
-        <div class="camera-info">
-          <div class="camera-header">
-            <span class="cam-num">${c.number}</span>
-            <span class="cam-name">${c.brand} ${c.model}</span>
-            <span class="status-badge" style="background:${STATUS_COLORS[c.status]}20;color:${STATUS_COLORS[c.status]}">${STATUS_LABELS[c.status]}</span>
-            ${c.bin_number ? `<span class="bin-badge">BIN: ${c.bin_number}</span>` : ''}
-          </div>
-          <div class="parts-row">
-            ${parts.map(([l,v]) => `<span class="part-badge ${v==='ok'?'part-ok':'part-bad'}">${l}: ${v==='ok'?'ОК':'✗'}</span>`).join('')}
-          </div>
-          ${c.notes ? `<div class="cam-notes">💬 ${c.notes}</div>` : ''}
+}
+
+async function doDelete(id) {
+  const idx = S.sales.findIndex(x => x.id === id);
+  const [removed] = S.sales.splice(idx, 1);
+  S.delId = null; S.saving = true; S.syncOk = null;
+  render();
+
+  try {
+    await dbDelete(id);
+    S.syncOk = true;
+  } catch(e) {
+    // Rollback
+    S.sales.splice(idx, 0, removed);
+    S.syncOk = false;
+    alert('Ошибка удаления. Попробуй ещё раз.');
+  } finally {
+    S.saving = false;
+    render();
+  }
+}
+
+function copyToForm(id) {
+  const s = S.sales.find(x => x.id === id);
+  if (!s) return;
+  S.newName = s.name;
+  S.newBuy  = s.buyPrice ? String(s.buyPrice) : '';
+  S.newSell = String(s.sellPrice);
+  S.editId  = null;
+  const now = new Date();
+  S.month = now.getMonth();
+  S.year  = now.getFullYear();
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('inName');
+    if (el) { el.scrollIntoView({behavior:'smooth', block:'center'}); el.focus(); el.select(); }
+  }, 80);
+}
+
+// ── RENDER ────────────────────────────────────────────────
+function render() {
+  const ms    = mSales(S.month, S.year).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const ys    = ySales(S.year);
+  const mRev  = sumRevenue(ms);
+  const mProf = sumProfit(ms);
+  const yProf = sumProfit(ys);
+
+  const spark  = Array.from({length:12}, (_,i) => sumProfit(mSales(i, S.year)));
+  const maxSp  = Math.max(...spark.map(Math.abs), 1);
+  const hasData = spark.map(v => v !== 0);
+
+  // Sync dot class
+  const syncCls = S.saving ? 'loading' : S.syncOk === true ? 'ok' : S.syncOk === false ? 'err' : '';
+
+  let h = `<div class="hdr">
+    <div class="hdr-top">
+      <span class="app-name">✦ Продажи</span>
+      <div class="hdr-right">
+        <div class="sync ${syncCls}" title="${S.saving?'Сохранение...':S.syncOk?'Синхронизировано':'Нет связи'}"></div>
+        <div class="year-nav">
+          <button class="yr-btn" onclick="S.year--;S.editId=null;render()">‹</button>
+          <span class="yr-num">${S.year}</span>
+          <button class="yr-btn" onclick="S.year++;S.editId=null;render()">›</button>
         </div>
-        <div class="card-actions">
-          <button class="btn-edit" onclick="openEditForm('${c.id}')">✏</button>
-          <button class="btn-delete" onclick="deleteCamera('${c.id}')">✕</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat revenue">
+        <div class="stat-lbl">Выручка<br>${MO[S.month]}</div>
+        <div class="stat-amt">$${fmt(mRev)}</div>
+        <div class="stat-cnt">${ms.length} ${plural(ms.length)}</div>
+      </div>
+      <div class="stat profit-m">
+        <div class="stat-lbl">Прибыль<br>${MO[S.month]}</div>
+        <div class="stat-amt">$${fmt(mProf)}</div>
+        <div class="stat-cnt">${mProf>=0?'▲':'▼'} чистая</div>
+      </div>
+      <div class="stat profit-y">
+        <div class="stat-lbl">Прибыль<br>${S.year}</div>
+        <div class="stat-amt">$${fmt(yProf)}</div>
+        <div class="stat-cnt">${ys.length} продаж</div>
+      </div>
+    </div>
+
+    <div class="sparkline">`;
+
+  for (let i = 0; i < 12; i++) {
+    const v = spark[i], cur = i === S.month;
+    const pct = v !== 0 ? Math.max((Math.abs(v)/maxSp)*100, 15) : 0;
+    const bg  = cur ? 'var(--accent)' : v > 0 ? 'var(--teal)' : v < 0 ? 'var(--red)' : 'var(--muted2)';
+    h += `<div class="sp-col" onclick="S.month=${i};S.editId=null;render()">
+      <div class="sp-bar${cur?' cur':''}" style="height:${pct}%;background:${bg};width:100%;border-radius:2px 2px 0 0;min-height:${pct>0?2:0}px"></div>
+      <div class="sp-lbl${cur?' cur':''}">${MO[i]}</div>
+    </div>`;
+  }
+
+  h += `</div><div class="tabs-wrap" id="tabsEl">`;
+  for (let i = 0; i < 12; i++) {
+    const cur = i === S.month, has = hasData[i] && !cur;
+    h += `<button class="tab${cur?' active':''}${has?' has-data':''}" onclick="S.month=${i};S.editId=null;render()">${MO[i]}</button>`;
+  }
+  h += `</div></div>`;
+
+  // Form
+  const busy = S.saving || S.loading;
+  h += `<div class="form-wrap"><div class="form-inner">
+    <input class="inp" id="inName" type="text" placeholder="Название товара"
+      value="${esc(S.newName)}" oninput="S.newName=this.value" ${busy?'disabled':''}
+      onkeydown="if(event.key==='Enter')document.getElementById('inBuy').focus()"/>
+    <div class="form-prices">
+      <div class="price-group">
+        <span class="price-prefix">$</span>
+        <input class="inp mono" id="inBuy" type="number" placeholder="Закупка" min="0" step="0.01"
+          value="${S.newBuy}" oninput="S.newBuy=this.value" ${busy?'disabled':''}
+          onkeydown="if(event.key==='Enter')document.getElementById('inSell').focus()"/>
+      </div>
+      <div class="price-group">
+        <span class="price-prefix">$</span>
+        <input class="inp mono" id="inSell" type="number" placeholder="Продажа" min="0" step="0.01"
+          value="${S.newSell}" oninput="S.newSell=this.value" ${busy?'disabled':''}
+          onkeydown="if(event.key==='Enter')addSale()"/>
+      </div>
+      <button class="btn-add" onclick="addSale()" ${busy?'disabled':''}>+</button>
+    </div>
+  </div></div>`;
+
+  // List
+  h += `<div class="list">`;
+  if (S.loading) {
+    h += `<div class="empty"><div class="empty-i">⏳</div>Загрузка...</div>`;
+  } else if (!ms.length) {
+    h += `<div class="empty"><div class="empty-i">📦</div>Нет продаж в ${MF[S.month].toLowerCase()}</div>`;
+  } else {
+    ms.forEach((s, i) => {
+      const profit    = s.sellPrice - s.buyPrice;
+      const profitCls = profit < 0 ? ' loss' : '';
+      if (S.editId === s.id) {
+        h += `<div class="row editing">
+          <div class="edit-row-top">
+            <input class="edit-inp" style="flex:1" value="${esc(S.editName)}"
+              oninput="S.editName=this.value"
+              onkeydown="if(event.key==='Enter')saveEdit('${s.id}')"/>
+            <button class="btn-x" onclick="S.editId=null;render()">✕</button>
+          </div>
+          <div class="edit-row-bot">
+            <input class="edit-inp mono sm" type="number" placeholder="Закупка"
+              value="${S.editBuy}" oninput="S.editBuy=this.value"/>
+            <span style="color:var(--muted);font-size:12px;">→</span>
+            <input class="edit-inp mono sm" type="number" placeholder="Продажа"
+              value="${S.editSell}" oninput="S.editSell=this.value"
+              onkeydown="if(event.key==='Enter')saveEdit('${s.id}')"/>
+            <button class="btn-ok" onclick="saveEdit('${s.id}')">Сохранить</button>
+          </div>
+        </div>`;
+      } else {
+        h += `<div class="row">
+          <span class="row-num">${i+1}</span>
+          <span class="row-name">${esc(s.name)}</span>
+          <span class="row-profit${profitCls}">${profit>=0?'+':''}${fmt(profit)}</span>
+          <div class="row-meta">
+            <div class="row-prices-txt">
+              <span class="price-buy">$${fmt(s.buyPrice)}</span>
+              <span class="price-arrow">→</span>
+              <span class="price-sell">$${fmt(s.sellPrice)}</span>
+            </div>
+            <span class="row-date">${fdate(s.date)}</span>
+          </div>
+          <div class="row-actions">
+            <button class="ico edit" onclick="S.editId='${s.id}';S.editName='${esc(s.name)}';S.editBuy='${s.buyPrice}';S.editSell='${s.sellPrice}';render()">✎</button>
+            <button class="ico copy" onclick="copyToForm('${s.id}')" title="Скопировать в форму">⧉</button>
+            <button class="ico del"  onclick="S.delId='${s.id}';render()">✕</button>
+          </div>
+        </div>`;
+      }
+    });
+  }
+  h += `</div>`;
+
+  // Delete modal
+  if (S.delId) {
+    const it = S.sales.find(x => x.id === S.delId);
+    const p  = it ? (it.sellPrice - it.buyPrice) : 0;
+    h += `<div class="overlay" onclick="if(event.target===this){S.delId=null;render()}">
+      <div class="modal">
+        <div class="modal-i">🗑</div>
+        <div class="modal-t">Удалить запись?</div>
+        <div class="modal-s">${esc(it?.name||'')} · прибыль $${fmt(p)}</div>
+        <div class="modal-btns">
+          <button class="btn-cancel" onclick="S.delId=null;render()">Отмена</button>
+          <button class="btn-del" onclick="doDelete('${S.delId}')">Удалить</button>
         </div>
       </div>
     </div>`;
-  }).join('');
+  }
+
+  document.getElementById('app').innerHTML = h;
+
+  setTimeout(() => {
+    const el = document.getElementById('tabsEl');
+    if (el) { const a = el.querySelector('.tab.active'); if (a) a.scrollIntoView({inline:'center', behavior:'smooth', block:'nearest'}); }
+  }, 60);
 }
 
-function renderBrandSelects() {
-  const opts = brands.map(b => `<option value="${b}">${b}</option>`).join('');
-  document.getElementById('f-brand').innerHTML = '<option value="">— выбери —</option>' + opts;
-  document.getElementById('filter-brand').innerHTML = '<option value="all">Все бренды</option>' + opts;
-}
-
-// ── FORM ──
-function openAddForm() {
-  editingId = null;
-  const num = padNum(getNextNum());
-  document.getElementById('form-title').textContent = 'Добавить камеру';
-  document.getElementById('form-num-display').textContent = num;
-  document.getElementById('f-brand').value = '';
-  document.getElementById('f-model').value = '';
-  document.getElementById('f-bin').value = '';
-  document.getElementById('f-status').value = 'working';
-  document.getElementById('f-body').value = 'ok';
-  document.getElementById('f-battery').value = 'ok';
-  document.getElementById('f-lens').value = 'ok';
-  document.getElementById('f-lcd').value = 'ok';
-  document.getElementById('f-notes').value = '';
-  document.getElementById('form-modal').style.display = 'flex';
-}
-
-function openEditForm(id) {
-  const c = cameras.find(x => x.id === id);
-  if (!c) return;
-  editingId = id;
-  document.getElementById('form-title').textContent = 'Редактировать ' + c.number;
-  document.getElementById('form-num-display').textContent = c.number;
-  document.getElementById('f-brand').value = c.brand || '';
-  document.getElementById('f-model').value = c.model || '';
-  document.getElementById('f-bin').value = c.bin_number || '';
-  document.getElementById('f-status').value = c.status || 'working';
-  document.getElementById('f-body').value = c.body || 'ok';
-  document.getElementById('f-battery').value = c.battery_lid || 'ok';
-  document.getElementById('f-lens').value = c.lens || 'ok';
-  document.getElementById('f-lcd').value = c.lcd || 'ok';
-  document.getElementById('f-notes').value = c.notes || '';
-  document.getElementById('form-modal').style.display = 'flex';
-}
-
-function closeForm() { document.getElementById('form-modal').style.display = 'none'; }
-
-async function saveCamera() {
-  const num = editingId ? cameras.find(c => c.id === editingId).number : padNum(getNextNum());
-  const cam = {
-    id: editingId || uid(),
-    number: num,
-    brand: document.getElementById('f-brand').value,
-    model: document.getElementById('f-model').value,
-    bin_number: document.getElementById('f-bin').value,
-    status: document.getElementById('f-status').value,
-    body: document.getElementById('f-body').value,
-    battery_lid: document.getElementById('f-battery').value,
-    lens: document.getElementById('f-lens').value,
-    lcd: document.getElementById('f-lcd').value,
-    notes: document.getElementById('f-notes').value,
-  };
-  const { error } = await sb.from('cameras').upsert(cam);
-  if (error) { showToast('Ошибка сохранения!', 'error'); return; }
-  if (editingId) { cameras = cameras.map(c => c.id === editingId ? {...c, ...cam} : c); }
-  else { cameras.push(cam); }
-  closeForm();
-  updateNextNumLabel();
-  showToast(editingId ? 'Камера обновлена' : `Камера ${num} добавлена`);
-  if (currentView === 'cameras') renderCameras();
-  if (currentView === 'dashboard') renderDashboard();
-}
-
-async function deleteCamera(id) {
-  if (!confirm('Удалить эту камеру?\nНомер останется занятым навсегда.')) return;
-  const { error } = await sb.from('cameras').delete().eq('id', id);
-  if (error) { showToast('Ошибка удаления!', 'error'); return; }
-  cameras = cameras.filter(c => c.id !== id);
-  updateNextNumLabel();
-  showToast('Камера удалена', 'error');
-  renderCameras();
-  if (currentView === 'dashboard') renderDashboard();
-}
-
-// ── BRANDS ──
-function openBrandMgr() {
-  renderBrandList();
-  document.getElementById('brand-modal').style.display = 'flex';
-}
-function closeBrandMgr() { document.getElementById('brand-modal').style.display = 'none'; }
-
-function renderBrandList() {
-  document.getElementById('brand-list').innerHTML = brands.map(b =>
-    `<div class="brand-item">
-      <span class="brand-name">${b}</span>
-      <button class="btn-remove-brand" onclick="removeBrand('${b}')">✕</button>
-    </div>`
-  ).join('');
-}
-
-async function addBrand() {
-  const val = document.getElementById('new-brand-input').value.trim();
-  if (!val || brands.includes(val)) return;
-  await sb.from('brands').insert({name: val});
-  brands = [...brands, val].sort();
-  document.getElementById('new-brand-input').value = '';
-  renderBrandList();
-  renderBrandSelects();
-}
-
-async function removeBrand(name) {
-  await sb.from('brands').delete().eq('name', name);
-  brands = brands.filter(b => b !== name);
-  renderBrandList();
-  renderBrandSelects();
-}
-
-// ── ASSEMBLY ──
-function renderAssembly() {
-  const q = document.getElementById('assembly-search').value.toLowerCase().trim();
-  const empty = document.getElementById('assembly-empty');
-  const results = document.getElementById('assembly-results');
-  if (!q) { empty.style.display = ''; results.innerHTML = ''; return; }
-  empty.style.display = 'none';
-  const matched = cameras.filter(c => c.model?.toLowerCase().includes(q) || c.brand?.toLowerCase().includes(q));
-  if (!matched.length) { results.innerHTML = '<div style="color:#555;padding:20px">Камеры не найдены</div>'; return; }
-  const isOk = c => c.status === 'working' && c.body === 'ok' && c.battery_lid === 'ok' && c.lens === 'ok' && c.lcd === 'ok';
-  const okCount = matched.filter(isOk).length;
-  const byBin = {};
-  matched.forEach(c => {
-    const key = c.bin_number || '—';
-    if (!byBin[key]) byBin[key] = {bin:key, total:0, ok:0, broken:0};
-    byBin[key].total++;
-    if (isOk(c)) byBin[key].ok++; else byBin[key].broken++;
-  });
-  results.innerHTML = `
-    <div class="assembly-stats">
-      ${[{l:'Найдено камер',v:matched.length,c:'#6366f1'},{l:'Можно собрать',v:okCount,c:'#22c55e'},{l:'Нужен ремонт',v:matched.length-okCount,c:'#ef4444'}]
-        .map(s => `<div class="assembly-card" style="border:1px solid ${s.c}28"><div class="assembly-num" style="color:${s.c}">${s.v}</div><div class="assembly-label">${s.l}</div></div>`).join('')}
-    </div>
-    <div class="section-title">ПО BIN-ЯЩИКАМ</div>
-    ${Object.values(byBin).sort((a,b) => a.bin.localeCompare(b.bin)).map(b =>
-      `<div class="bin-row">
-        <span class="bin-name">BIN #${b.bin}</span>
-        <div class="bin-stats">
-          <span style="font-size:12px;color:#777">Всего: <strong style="color:#fff">${b.total}</strong></span>
-          <span style="font-size:12px;color:#22c55e">ОК: <strong>${b.ok}</strong></span>
-          <span style="font-size:12px;color:#ef4444">Неисправны: <strong>${b.broken}</strong></span>
-        </div>
-      </div>`).join('')}
-    <div class="section-title" style="margin-top:16px">ДЕТАЛИ</div>
-    ${matched.map(c => {
-      const ok = isOk(c);
-      return `<div style="background:#16161f;border:1px solid ${ok?'#166534':'#1a1a2a'};border-radius:6px;padding:8px 14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:5px">
-        <div style="display:flex;gap:10px;align-items:center">
-          <span style="color:#6366f1;font-size:12px">${c.number}</span>
-          ${c.bin_number ? `<span style="color:#a5b4fc;font-size:11px">BIN: ${c.bin_number}</span>` : ''}
-          ${ok ? `<span style="color:#22c55e;font-size:10px">✓ Готова к сборке</span>` : ''}
-        </div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap">
-          <span style="background:${STATUS_COLORS[c.status]}20;color:${STATUS_COLORS[c.status]};font-size:10px;padding:2px 5px;border-radius:3px">${STATUS_LABELS[c.status]}</span>
-          ${[['К',c.body],['АКБ',c.battery_lid],['Obj',c.lens],['LCD',c.lcd]].map(([l,v]) =>
-            `<span style="font-size:10px;padding:2px 5px;border-radius:3px;background:${v==='ok'?'#14532d44':'#7f1d1d44'};color:${v==='ok'?'#86efac':'#fca5a5'}">${l}</span>`).join('')}
-        </div>
-      </div>`;
-    }).join('')}
-  `;
-}
-
-// ── PRINT ──
-function printList() {
-  const search = document.getElementById('search-input').value.toLowerCase();
-  const fStatus = document.getElementById('filter-status').value;
-  const fBrand = document.getElementById('filter-brand').value;
-  const filtered = cameras.filter(c => {
-    if (fStatus !== 'all' && c.status !== fStatus) return false;
-    if (fBrand !== 'all' && c.brand !== fBrand) return false;
-    if (search) return (c.number+c.model+c.brand+c.bin_number+c.notes).toLowerCase().includes(search);
-    return true;
-  });
-  const w = window.open('','_blank');
-  w.document.write(`<html><head><title>Список камер</title><style>
-    body{font-family:Arial,sans-serif;font-size:12px}
-    table{width:100%;border-collapse:collapse}
-    th,td{border:1px solid #ccc;padding:5px 8px;text-align:left}
-    th{background:#eee;font-weight:bold}
-    tr:nth-child(even){background:#f9f9f9}
-    h2{margin-bottom:4px}.meta{color:#777;font-size:11px;margin-bottom:12px}
-  </style></head><body>
-  <h2>Список камер</h2>
-  <div class="meta">Дата: ${new Date().toLocaleDateString('ru-RU')} · Всего: ${filtered.length}</div>
-  <table><thead><tr><th>Номер</th><th>Бренд</th><th>Модель</th><th>BIN</th><th>Статус</th><th>Корпус</th><th>АКБ крышка</th><th>Объектив</th><th>ЖК</th><th>Заметки</th></tr></thead>
-  <tbody>${filtered.map(c => `<tr>
-    <td>${c.number}</td><td>${c.brand||''}</td><td>${c.model||''}</td><td>${c.bin_number||''}</td>
-    <td>${STATUS_LABELS[c.status]}</td>
-    <td>${c.body==='ok'?'ОК':'Сломан'}</td><td>${c.battery_lid==='ok'?'ОК':'Сломана'}</td>
-    <td>${c.lens==='ok'?'ОК':'Сломан'}</td><td>${c.lcd==='ok'?'ОК':'Разбит'}</td>
-    <td>${c.notes||''}</td>
-  </tr>`).join('')}</tbody></table></body></html>`);
-  w.document.close(); w.print();
-}
-
-// ── INIT ──
-loadAll();
+// ── INIT ──────────────────────────────────────────────────
+render(); // show loading state immediately
+dbLoad(); // fetch from Supabase
 </script>
 </body>
 </html>
